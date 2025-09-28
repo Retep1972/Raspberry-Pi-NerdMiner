@@ -1,6 +1,8 @@
-Requirements
+High level working:
+Miner → Log → Dashboard → Touchscreen/Web
 
-Raspberry Pi (any model with Linux + Python 3.9+; Pi 4 recommended)
+Requirements
+Raspberry Pi (any model with Linux + Python 3.9+; tested on 3b but other should work as well)
 
 RPi 7" touchscreen (or HDMI screen)
 
@@ -15,7 +17,6 @@ A Bitcoin wallet address (bech32 recommended, e.g. bc1...)
 Installation
 
 Update system + dependencies
-
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3 python3-pip python3-tk git curl \
     libjansson4 libjansson-dev automake autotools-dev build-essential
