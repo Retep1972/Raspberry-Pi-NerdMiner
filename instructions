@@ -32,10 +32,9 @@ cd cpuminer
 make
 cd ..
 
-
 The miner binary will be in cpuminer/minerd.
 
-🔧 Configuration
+Configuration
 
 Service file for cpuminer
 
@@ -72,3 +71,38 @@ sudo systemctl start cpuminer
 
 Monitor logs:
 journalctl -u cpuminer -f
+
+Dashboard as a Service (autostart on boot)
+Create a service file for the dashboard:
+
+sudo nano /etc/systemd/system/piminer-dashboard.service
+
+Paste this (adjust paths to where your Python file lives):
+
+[Unit]
+Description=Pi Lottery Miner Dashboard
+After=graphical.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/rpi-nerdminer
+ExecStart=/usr/bin/python3 /home/pi/rpi-nerdminer/pi_lottery_miner.py
+Restart=always
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+
+[Install]
+WantedBy=graphical.target
+
+Notes:
+Replace pi if you’re running under another username.
+DISPLAY=:0 assumes you’re running the standard Pi desktop on the touchscreen.
+
+Enable and start it:
+sudo systemctl daemon-reexec
+sudo systemctl enable piminer-dashboard
+sudo systemctl start piminer-dashboard
+
+if blockheight on dashboard shows: --
+sudo apt install --reinstall ca-certificates -y
+sudo update-ca-certificates
