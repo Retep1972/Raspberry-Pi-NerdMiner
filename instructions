@@ -1,0 +1,74 @@
+Requirements
+
+Raspberry Pi (any model with Linux + Python 3.9+; Pi 4 recommended)
+
+RPi 7" touchscreen (or HDMI screen)
+
+Python 3 with tkinter + requests
+
+cpuminer (for actual hashing)
+
+Internet access (for difficulty + block height)
+
+A Bitcoin wallet address (bech32 recommended, e.g. bc1...)
+
+Installation
+
+Update system + dependencies
+
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3 python3-pip python3-tk git curl \
+    libjansson4 libjansson-dev automake autotools-dev build-essential
+pip3 install requests pillow
+
+Clone this repo
+
+Build cpuminer
+
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./configure CFLAGS="-O3"
+make
+cd ..
+
+
+The miner binary will be in cpuminer/minerd.
+
+🔧 Configuration
+
+Service file for cpuminer
+
+Create /etc/systemd/system/cpuminer.service:
+
+[Unit]
+Description=cpuminer (CPU lottery mining)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/rpi-nerdminer/cpuminer
+ExecStart=/home/pi/rpi-nerdminer/cpuminer/minerd -a sha256d -o stratum+tcp://solo.ckpool.org:3333 -O "bc1qYOURWALLETADDRESS:x" --threads=2 
+Restart=always
+RestartSec=5
+Nice=10
+StandardOutput=append:/home/pi/.local/share/cpuminer.log
+StandardError=append:/home/pi/.local/share/cpuminer.log
+
+[Install]
+WantedBy=multi-user.target
+
+
+Replace bc1qYOURWALLETADDRESS with your own wallet.
+Adjust --threads depending on your Pi (2 threads is safe for a Pi 4).
+
+Enable + start:
+
+sudo systemctl daemon-reexec
+sudo systemctl enable cpuminer
+sudo systemctl start cpuminer
+
+
+Monitor logs:
+journalctl -u cpuminer -f
