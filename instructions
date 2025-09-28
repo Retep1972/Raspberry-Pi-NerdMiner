@@ -23,9 +23,9 @@ sudo apt install -y python3 python3-pip python3-tk git curl \
 pip3 install requests pillow
 
 Clone this repo
+https://github.com/Retep1972/Raspberry-Pi-NerdMiner.git
 
 Build cpuminer
-
 git clone https://github.com/pooler/cpuminer.git
 cd cpuminer
 ./autogen.sh
@@ -38,7 +38,6 @@ The miner binary will be in cpuminer/minerd.
 Configuration
 
 Service file for cpuminer
-
 Create /etc/systemd/system/cpuminer.service:
 
 [Unit]
@@ -59,12 +58,10 @@ StandardError=append:/home/pi/.local/share/cpuminer.log
 [Install]
 WantedBy=multi-user.target
 
-
 Replace bc1qYOURWALLETADDRESS with your own wallet.
 Adjust --threads depending on your Pi (2 threads is safe for a Pi 4).
 
 Enable + start:
-
 sudo systemctl daemon-reexec
 sudo systemctl enable cpuminer
 sudo systemctl start cpuminer
@@ -79,7 +76,6 @@ Create a service file for the dashboard:
 sudo nano /etc/systemd/system/piminer-dashboard.service
 
 Paste this (adjust paths to where your Python file lives):
-
 [Unit]
 Description=Pi Lottery Miner Dashboard
 After=graphical.target
