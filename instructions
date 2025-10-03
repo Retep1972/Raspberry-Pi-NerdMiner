@@ -114,7 +114,7 @@ Wants=multi-user.target
 Type=simple
 # Root needed to write /sys/class/backlight/* and to power off
 User=root
-ExecStart=/usr/bin/python3 /home/pi-miner/piminer/screen_power_therm_guard.py --idle-secs 300 --mode off --temp-threshold 75 --check-interval 30 --grace-reads 2 --log-file /var/log/pi_guard.log
+ExecStart=/usr/bin/python3 /home/pi-miner/piminer/screen_power_therm_guard.py --idle-secs 300 --mode off --temp-threshold 80 --check-interval 30 --grace-reads 2 --log-file /var/log/pi_guard.log
 Restart=always
 RestartSec=2
 
