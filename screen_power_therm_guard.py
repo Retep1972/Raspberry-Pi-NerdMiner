@@ -28,25 +28,27 @@ DEFAULT_GRACE_READS     = int(os.environ.get("GRACE_READS", "2"))          # con
 PROC_INPUT = "/proc/bus/input/devices"
 
 # ------------------------ Helpers: touch + backlight ------------------------
-def find_touch_event(name_regex: str):
-    """Find a touchscreen-like /dev/input/eventX via /proc/bus/input/devices."""
+def list_event_devices():
+    """Return list of (path, name) for all /dev/input/event* devices."""
+    devs = []
     try:
         with open(PROC_INPUT, "r", encoding="utf-8", errors="ignore") as f:
             blocks = f.read().split("\n\n")
-        pat = re.compile(name_regex)
+        by_event = {}
         for b in blocks:
             name_m = re.search(r'Name="([^"]+)"', b)
-            if name_m and pat.search(name_m.group(1)):
-                h = re.search(r'Handlers=.*?(event\d+)', b)
-                if h:
-                    ev = "/dev/input/" + h.group(1)
-                    if os.path.exists(ev):
-                        return ev, name_m.group(1)
+            h = re.search(r'Handlers=.*?(event\d+)', b)
+            if name_m and h:
+                by_event[h.group(1)] = name_m.group(1)
+        for path in sorted(glob.glob("/dev/input/event*")):
+            ev = os.path.basename(path)
+            devs.append((path, by_event.get(ev, ev)))
     except Exception:
-        pass
-    # fallback: first event device
-    cand = sorted(glob.glob("/dev/input/event*"))
-    return (cand[0], os.path.basename(cand[0])) if cand else (None, None)
+        # fallback: just list event files
+        for path in sorted(glob.glob("/dev/input/event*")):
+            devs.append((path, os.path.basename(path)))
+    return devs
+
 
 def find_backlight_path(explicit: str | None):
     if explicit and os.path.isdir(explicit):
@@ -135,21 +137,34 @@ class TouchIdleThread(threading.Thread):
         self.stop_flag = threading.Event()
 
     def run(self):
-        event_path, dev_name = find_touch_event(self.touch_re)
-        if not event_path:
-            log("No input event device found; TouchIdleThread exiting.")
-            return
         bl_base = find_backlight_path(self.backlight_path)
         if not bl_base:
             log("No backlight path found; TouchIdleThread exiting.")
             return
-
-        log(f"Touch: {event_path} ({dev_name})  •  Backlight: {bl_base}")
         bl = Backlight(bl_base)
 
-        fd = os.open(event_path, os.O_RDONLY | os.O_NONBLOCK)
+        # Open ALL event devices (root recommended so you can read them)
+        devices = list_event_devices()
+        fds = []
         poller = select.poll()
-        poller.register(fd, select.POLLIN)
+        for path, name in devices:
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+                fds.append((fd, path, name))
+                poller.register(fd, select.POLLIN)
+            except PermissionError:
+                log(f"Permission denied opening {path} ({name}); run as root or fix udev perms")
+            except Exception as e:
+                log(f"Failed opening {path} ({name}): {e}")
+
+        if not fds:
+            log("No readable /dev/input/event* devices; TouchIdleThread exiting.")
+            return
+
+        log("Monitoring input devices:")
+        for _, path, name in fds:
+            log(f"  - {path}  [{name}]")
+        log(f"Backlight: {bl_base}")
 
         last_activity = time.time()
         blanked = False
@@ -161,10 +176,22 @@ class TouchIdleThread(threading.Thread):
                 now = time.time()
 
                 if events:
-                    try: os.read(fd, 4096)
-                    except BlockingIOError: pass
+                    # Drain a little from each signaled fd
+                    woke_from = None
+                    for fd, path, name in fds:
+                        try:
+                            r = select.poll()
+                            r.register(fd, select.POLLIN)
+                            if r.poll(0):
+                                os.read(fd, 4096)  # discard
+                                woke_from = woke_from or f"{path} [{name}]"
+                        except BlockingIOError:
+                            pass
+                        except Exception:
+                            pass
                     last_activity = now
                     if blanked or dimmed:
+                        log(f"Input activity → wake from {woke_from}")
                         bl.on()
                         blanked = False
                         dimmed = False
@@ -186,8 +213,9 @@ class TouchIdleThread(threading.Thread):
                             blanked = False
                 time.sleep(0.05)
         finally:
-            try: os.close(fd)
-            except Exception: pass
+            for fd, _, _ in fds:
+                try: os.close(fd)
+                except Exception: pass
 
 class TempGuardThread(threading.Thread):
     def __init__(self, threshold_c, check_interval_s, grace_reads):
